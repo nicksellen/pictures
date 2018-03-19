@@ -85,6 +85,7 @@ const api = {
             method: 'POST',
             body: JSON.stringify({
                 size: 2000,
+                /*
                 facets: {
                     tags: {
                         size: 10,
@@ -113,16 +114,18 @@ const api = {
                         ]
                     }
                 },
+                */
+                /*
                 highlight: {
                     style: 'html',
                     fields: [
-                        'File:FileName',
                         'XMP:Subject',
                         'XMP:Rating' 
                     ]
                 },
+                */
                 query: query,
-                fields: ['*'],
+                fields: ['XMP:Subject', 'XMP:Rating'],
                 sort: ['_id']
             })
         }).then(response => response.json())
@@ -138,6 +141,9 @@ new Vue({
             hitIdxById: {},
             selectedId: null,
             atLeastOnceVisibleIdxs: [],
+            currentlyVisibleIdxs: [],
+            lastMinVisibleIdx: -1,
+            lastMaxVisibleIdx: -1
         }
     },
     watch: {
@@ -220,7 +226,7 @@ new Vue({
             const gridItem = document.querySelector('.grid-item')
             return Math.round(grid.offsetWidth / gridItem.offsetWidth)
         },
-        checkVisible (isDown) {
+        checkVisible (isDown = true) {
             const hitEls = this.$refs.hits
             let checked = 0
             if (hitEls && hitEls.length > 0) {
@@ -230,27 +236,64 @@ new Vue({
                 let maxVisibleIdx = -1
                 let foundVisible = false
 
-                for (let idx = 0; idx < hitEls.length; idx += columnCount) {
-                    let el = hitEls[idx]
-                    checked++
-                    if (utils.isElementPartiallyInViewport(el)) {
-                        if (!foundVisible) {
-                            minVisibleIdx = idx
-                        }
-                        foundVisible = true
-                    } else {
-                        if (foundVisible) {
-                            maxVisibleIdx = idx - 1
-                            break
+                if (isDown) {
+
+                    // downward scroll
+
+                    const startIdx = this.lastMaxVisibleIdx !== -1 ? this.lastMaxVisibleIdx : 0
+                    //const startIdx = this.lastMinVisibleIdx !== -1 ? this.lastMinVisibleIdx : 0
+
+                    for (let idx = startIdx; idx < hitEls.length; idx += columnCount) {
+                        let el = hitEls[idx]
+                        checked++
+                        if (utils.isElementPartiallyInViewport(el)) {
+                            if (!foundVisible) {
+                                minVisibleIdx = idx
+                            }
+                            foundVisible = true
+                        } else {
+                            if (foundVisible) {
+                                maxVisibleIdx = idx - 1
+                                break
+                            }
                         }
                     }
+                    if (minVisibleIdx !== -1 && maxVisibleIdx === -1) maxVisibleIdx = hitEls.length - 1
+                } else {
+                    // upward scroll!
+
+                    const startIdx = this.lastMinVisibleIdx !== -1 ? this.lastMinVisibleIdx : hitEls.length - 1
+                    //const startIdx = this.lastMaxVisibleIdx !== -1 ? this.lastMaxVisibleIdx : hitEls.length - 1
+
+                    for (let idx = startIdx; idx > 0; idx -= columnCount) {
+                        let el = hitEls[idx]
+                        checked++
+                        if (utils.isElementPartiallyInViewport(el)) {
+                            if (!foundVisible) {
+                                maxVisibleIdx = idx
+                            }
+                            foundVisible = true
+                        } else {
+                            if (foundVisible) {
+                                minVisibleIdx = idx - 1
+                                break
+                            }
+                        }
+                    }
+                    if (maxVisibleIdx !== -1 && minVisibleIdx === -1) minVisibleIdx = 0
                 }
-                if (minVisibleIdx !== -1) {
-                    if (maxVisibleIdx === -1) maxVisibleIdx = hitEls.length - 1
+
+                if (minVisibleIdx !== -1 && maxVisibleIdx !== -1) {
+                    const currentlyVisibleIdxs = []
                     for (let idx = minVisibleIdx; idx <= maxVisibleIdx; idx++) {
                         Vue.set(this.atLeastOnceVisibleIdxs, idx, true)
+                        currentlyVisibleIdxs[idx] = true
                     }
+                    this.currentlyVisibleIdxs = currentlyVisibleIdxs
                 }
+
+                this.lastMinVisibleIdx = minVisibleIdx
+                this.lastMaxVisibleIdx = maxVisibleIdx
             }
         },
         search() {
@@ -266,7 +309,7 @@ new Vue({
             })
         },
         thumbnailSrc (id) {
-            return `/images/${id}`
+            return `/images/320x240/${id}`
         },
         select (id) {
             this.selectedId = id
@@ -277,6 +320,7 @@ new Vue({
             return val.split(',')
         },
         isVisible (idx) {
+            //return this.currentlyVisibleIdxs[idx]
             return this.atLeastOnceVisibleIdxs[idx]
         }
     },

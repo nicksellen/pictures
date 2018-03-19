@@ -211,9 +211,15 @@
   packages = ["unix"]
   revision = "2f1e207ee39ff70f3433e49c6eb52677a515e3b5"
 
+[[projects]]
+  name = "gopkg.in/h2non/bimg.v1"
+  packages = ["."]
+  revision = "02e621739c77c791d8c153f240b7a1f75b07816f"
+  version = "v1.0.18"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "262def35442625ab8380786542f3606cad49e818d69827a1409137f4330d59a5"
+  inputs-digest = "f52adcbd84cbece76a2e41c2454fc3e0abfc802599f0a0171370d87d83c4a537"
   solver-name = "gps-cdcl"
   solver-version = 1

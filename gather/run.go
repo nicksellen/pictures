@@ -11,10 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/disintegration/imaging"
 	"github.com/kurin/blazer/b2"
 	"github.com/rwcarlsen/goexif/exif"
+	bimg "gopkg.in/h2non/bimg.v1"
 )
 
 // Gather holds information about our gathering
@@ -112,120 +114,107 @@ func (g *Gather) yay() error {
 		if err != nil && err != io.EOF {
 			return err
 		}
+		var wg sync.WaitGroup
+
+		var sem = make(chan bool, 10)
+
+		wg.Add(len(objs))
+
 		for _, obj := range objs {
 
-			// We might already have the file here...
+			sem <- true
 
-			// TODO: loop around available locations
+			go func(obj *b2.Object) {
+				defer func() { <-sem }()
+				defer wg.Done()
 
-			name := obj.Name()
+				name := obj.Name()
 
-			ext := strings.ToLower(filepath.Ext(name))
+				ext := strings.ToLower(filepath.Ext(name))
 
-			if ext != ".jpg" {
-				log.Printf("ignoring entry with extension [%s]\n", ext)
-				continue
-			}
-
-			/*
-				b2attrs, err := obj.Attrs(g.ctx)
-				if err != nil {
-					return err
-				}
-			*/
-
-			log.Printf("[%s] processing\n", name)
-
-			// Ensure we have a thumbnail
-
-			thumbnailSpecs := []thumbnailSpec{
-				thumbnailSpec{1024, 768, true},
-				thumbnailSpec{320, 240, false},
-			}
-
-			for _, size := range thumbnailSpecs {
-				thumbnailFilename, err := g.findThumbnail(name, size)
-				if err != nil {
-					return err
+				if ext != ".jpg" {
+					log.Printf("ignoring entry with extension [%s]\n", ext)
+					return
 				}
 
-				if thumbnailFilename == "" {
-					// No thumbnail :( make one!
-					thumbnailFilename, err = g.createThumbnail(obj, size)
+				log.Printf("[%s] processing\n", name)
+
+				thumbnailSpecs := []thumbnailSpec{
+					thumbnailSpec{1024, 768, true},
+					thumbnailSpec{320, 240, false},
+				}
+
+				var missingSpecs []thumbnailSpec
+
+				for _, spec := range thumbnailSpecs {
+					thumbnailFilename, err := g.findThumbnail(name, spec)
 					if err != nil {
-						return err
+						log.Fatal(err)
 					}
-					log.Printf("[%s] created %dx%d thumbnail\n", name, size.width, size.height)
+
+					if thumbnailFilename == "" {
+						missingSpecs = append(missingSpecs, spec)
+					}
 				}
-			}
 
-			// Ensure we have metadata
-
-			metadataName := name + ".json"
-
-			metadataFilename := filepath.Join(g.basedir, "metadata", metadataName)
-
-			metadataExists, err := fileExists(metadataFilename)
-			if err != nil {
-				return err
-			}
-
-			if !metadataExists {
-				otherPlace, err := g.find(metadataName)
-				if err != nil {
-					return err
-				}
-				if otherPlace == "" {
-					log.Printf("cannot find metadata for %s\n", name)
-					// better download it...
-					// ...except I haven't uploaded any to b2 yet
-					continue
-				}
-				err = copyFile(otherPlace, metadataFilename)
-				if err != nil {
-					return err
-				}
-				log.Printf("[%s] copied meta\n", name)
-			}
-
-			// log.Printf("metadata is %s\n", metadataFilename)
-
-			// return nil
-
-			/*
-
-					SHA1 := calculateSHA1(filename)
-					stat, err := os.Stat(filename)
+				if len(missingSpecs) > 0 {
+					fullsizeFilename, err := g.findOrDownload(obj)
 					if err != nil {
-						return err
+						log.Fatal(err)
 					}
+					var wgObj sync.WaitGroup
+					wgObj.Add(len(missingSpecs))
 
-					if SHA1 != b2attrs.SHA1 {
-						log.Printf("SHA1 does not match :/ %s vs %s\n", SHA1, b2attrs.SHA1)
-						log.Fatal("dead!")
-					} else {
-						log.Printf("SHA1 matches!\n")
+					for _, spec := range missingSpecs {
+						go func(name string, spec thumbnailSpec, fullsizeFilename string) {
+							defer wgObj.Done()
+							err = makeThumbnail(fullsizeFilename, g.thumbnailFilenameFor(name, spec), spec)
+							if err != nil {
+								log.Fatal(err)
+							}
+							log.Printf("[%s] created %dx%d thumbnail\n", name, spec.width, spec.height)
+						}(name, spec, fullsizeFilename)
 					}
-
-					if stat.Size() != b2attrs.Size {
-						log.Printf("size does not match :/ %d vs %d\n", stat.Size(), b2attrs.Size)
-						log.Fatal("dead!")
-					} else {
-						log.Printf("size matches!\n")
-					}
-
-				err = os.MkdirAll(filepath.Dir(thumbnailFilename), os.ModePerm)
-				if err != nil {
-					return err
+					wgObj.Wait()
 				}
 
-				err = makeThumbnail(filename, thumbnailFilename)
+				metadataName := name + ".json"
+
+				metadataFilename := filepath.Join(g.basedir, "metadata", metadataName)
+
+				metadataExists, err := fileExists(metadataFilename)
 				if err != nil {
-					return err
+					log.Fatal(err)
 				}
-			*/
-			// log.Printf("created thumbnail %", thumbnailFilename)
+
+				if !metadataExists {
+					otherPlace, err := g.find(metadataName)
+					if err != nil {
+						log.Fatal(err)
+					}
+					if otherPlace == "" {
+						log.Printf("cannot find metadata for %s\n", name)
+						// better download it...
+						// ...except I haven't uploaded any to b2 yet
+						return
+					}
+					err = copyFile(otherPlace, metadataFilename)
+					if err != nil {
+						log.Fatal(err)
+					}
+					log.Printf("[%s] copied meta\n", name)
+				}
+
+			}(obj)
+
 		}
+
+		wg.Wait()
+
+		for i := 0; i < cap(sem); i++ {
+			sem <- true
+		}
+
 		if err == io.EOF {
 			return nil
 		}
@@ -257,11 +246,6 @@ func NewGather(b2id string, b2key string, b2path string) (*Gather, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// destDirBase := "/tmp/pictures-foo"
-	// metadataDirBase := filepath.Join(destDirBase, "metadata")
-	// downloadDirBase := filepath.Join(destDirBase, "downloads")
-	// thumbnailDirBase := filepath.Join(destDirBase, "thumbnails", "300x300")
 
 	basedir := "/tmp/pictures-foo"
 
@@ -303,7 +287,6 @@ func b2DownloadFile(ctx context.Context, bucket *b2.Bucket, b2object *b2.Object,
 	reader := b2object.NewReader(ctx)
 	defer reader.Close()
 
-	// destFile, err := b2.file.Create(destFilename)
 	destFile, err := os.OpenFile(destFilename, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return err
@@ -317,6 +300,38 @@ func b2DownloadFile(ctx context.Context, bucket *b2.Bucket, b2object *b2.Object,
 }
 
 func makeThumbnail(sourceFilename string, destFilename string, size thumbnailSpec) error {
+	return makeThumbnailVips(sourceFilename, destFilename, size)
+}
+
+func makeThumbnailVips(sourceFilename string, destFilename string, spec thumbnailSpec) error {
+	destDir := filepath.Dir(destFilename)
+	err := os.MkdirAll(destDir, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	buffer, err := bimg.Read(sourceFilename)
+	if err != nil {
+		return err
+	}
+
+	options := bimg.Options{
+		Width:        spec.width,
+		Height:       spec.height,
+		Crop:         true,
+		NoAutoRotate: spec.preserveOrientation,
+	}
+
+	//newImage, err := bimg.NewImage(buffer).Resize(spec.width, spec.height)
+	newImage, err := bimg.NewImage(buffer).Process(options)
+	if err != nil {
+		return err
+	}
+
+	return bimg.Write(destFilename, newImage)
+}
+
+func makeThumbnailImaging(sourceFilename string, destFilename string, size thumbnailSpec) error {
 
 	orientation, err := getOrientation(sourceFilename)
 	if err != nil {
