@@ -27,6 +27,13 @@ type Gather struct {
 	basedir    string
 }
 
+type thumbnailSpec struct {
+	width  int
+	height int
+	// keep vertical pictures vertical? (or make them all horiontal)
+	preserveOrientation bool
+}
+
 func (g *Gather) find(name string) (string, error) {
 	for _, dir := range g.searchDirs {
 		// we check if it's available
@@ -61,7 +68,7 @@ func (g *Gather) findOrDownload(object *b2.Object) (string, error) {
 	return filename, nil
 }
 
-func (g *Gather) findThumbnail(name string, size []int) (string, error) {
+func (g *Gather) findThumbnail(name string, size thumbnailSpec) (string, error) {
 	filename := g.thumbnailFilenameFor(name, size)
 	exists, err := fileExists(filename)
 	if err != nil {
@@ -73,12 +80,12 @@ func (g *Gather) findThumbnail(name string, size []int) (string, error) {
 	return "", nil
 }
 
-func (g *Gather) thumbnailFilenameFor(name string, size []int) string {
-	sizeDir := fmt.Sprintf("%dx%d", size[0], size[1])
+func (g *Gather) thumbnailFilenameFor(name string, size thumbnailSpec) string {
+	sizeDir := fmt.Sprintf("%dx%d", size.width, size.height)
 	return filepath.Join(g.basedir, "thumbnails", sizeDir, name)
 }
 
-func (g *Gather) createThumbnail(object *b2.Object, size []int) (string, error) {
+func (g *Gather) createThumbnail(object *b2.Object, size thumbnailSpec) (string, error) {
 	filename, err := g.findOrDownload(object)
 	if err != nil {
 		return "", err
@@ -120,26 +127,35 @@ func (g *Gather) yay() error {
 				continue
 			}
 
-			b2attrs, err := obj.Attrs(g.ctx)
-			if err != nil {
-				return err
-			}
+			/*
+				b2attrs, err := obj.Attrs(g.ctx)
+				if err != nil {
+					return err
+				}
+			*/
 
-			log.Printf("processing [%s] %s / %d\n", name, b2attrs.SHA1, b2attrs.Size)
+			log.Printf("[%s] processing\n", name)
 
 			// Ensure we have a thumbnail
 
-			thumbnailSize := []int{1024, 786}
-			thumbnailFilename, err := g.findThumbnail(name, thumbnailSize)
-			if err != nil {
-				return err
+			thumbnailSpecs := []thumbnailSpec{
+				thumbnailSpec{1024, 768, true},
+				thumbnailSpec{320, 240, false},
 			}
 
-			if thumbnailFilename == "" {
-				// No thumbnail :( make one!
-				thumbnailFilename, err = g.createThumbnail(obj, thumbnailSize)
+			for _, size := range thumbnailSpecs {
+				thumbnailFilename, err := g.findThumbnail(name, size)
 				if err != nil {
 					return err
+				}
+
+				if thumbnailFilename == "" {
+					// No thumbnail :( make one!
+					thumbnailFilename, err = g.createThumbnail(obj, size)
+					if err != nil {
+						return err
+					}
+					log.Printf("[%s] created %dx%d thumbnail\n", name, size.width, size.height)
 				}
 			}
 
@@ -169,10 +185,10 @@ func (g *Gather) yay() error {
 				if err != nil {
 					return err
 				}
+				log.Printf("[%s] copied meta\n", name)
 			}
 
-			log.Printf("thumbnail is %s\n", thumbnailFilename)
-			log.Printf("metadata is %s\n", metadataFilename)
+			// log.Printf("metadata is %s\n", metadataFilename)
 
 			// return nil
 
@@ -276,7 +292,7 @@ func Run(b2id string, b2key string, b2path string) error {
 
 func b2DownloadFile(ctx context.Context, bucket *b2.Bucket, b2object *b2.Object, destFilename string) error {
 
-	log.Printf("downloading %s\n", b2object.Name())
+	log.Printf("[%s] downloading from b2\n", b2object.Name())
 
 	downloadDir := filepath.Dir(destFilename)
 	err := os.MkdirAll(downloadDir, os.ModePerm)
@@ -300,7 +316,7 @@ func b2DownloadFile(ctx context.Context, bucket *b2.Bucket, b2object *b2.Object,
 	return destFile.Close()
 }
 
-func makeThumbnail(sourceFilename string, destFilename string, size []int) error {
+func makeThumbnail(sourceFilename string, destFilename string, size thumbnailSpec) error {
 
 	orientation, err := getOrientation(sourceFilename)
 	if err != nil {
@@ -312,41 +328,50 @@ func makeThumbnail(sourceFilename string, destFilename string, size []int) error
 		return nil
 	}
 
+	// http://sylvana.net/jpegcrop/exif_orientation.html
+	if orientation == 6 {
+		src = imaging.Rotate270(src)
+	} else if orientation == 3 {
+		src = imaging.Rotate180(src)
+	} else if orientation == 8 {
+		src = imaging.Rotate90(src)
+	}
+
 	srcWidth := src.Bounds().Dx()
 	srcHeight := src.Bounds().Dy()
 
 	width := 0
 	height := 0
 
-	longest := 0
-	shortest := 0
+	if size.preserveOrientation {
 
-	if size[0] > size[1] {
-		longest = size[0]
-		shortest = size[1]
-	} else {
-		longest = size[1]
-		shortest = size[0]
-	}
+		longest := 0
+		shortest := 0
 
-	if srcWidth > srcHeight {
-		width = longest
-		height = shortest
+		if size.width > size.height {
+			longest = size.width
+			shortest = size.height
+		} else {
+			longest = size.height
+			shortest = size.width
+		}
+
+		if srcWidth > srcHeight {
+			width = longest
+			height = shortest
+		} else {
+			width = shortest
+			height = longest
+		}
+
 	} else {
-		width = shortest
-		height = longest
+
+		width = size.width
+		height = size.height
+
 	}
 
 	dst := imaging.Fill(src, width, height, imaging.Center, imaging.Lanczos)
-
-	// http://sylvana.net/jpegcrop/exif_orientation.html
-	if orientation == 6 {
-		dst = imaging.Rotate270(dst)
-	} else if orientation == 3 {
-		dst = imaging.Rotate180(dst)
-	} else if orientation == 8 {
-		dst = imaging.Rotate90(dst)
-	}
 
 	destDir := filepath.Dir(destFilename)
 	err = os.MkdirAll(destDir, os.ModePerm)

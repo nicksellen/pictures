@@ -41,7 +41,7 @@ func Run() error {
 	mux.Handle("/", http.FileServer(http.Dir("frontend/dist")))
 	mux.Handle("/api/", router)
 
-	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("/tmp/pictures-foo/thumbnails/1024x786"))))
+	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("/tmp/pictures-foo/thumbnails"))))
 
 	log.Printf("listening on %v", bindAddr)
 	return http.ListenAndServe(bindAddr, mux)
