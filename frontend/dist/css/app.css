@@ -18,6 +18,12 @@ body {
     padding: 10px;
 }
 
+@media (min-width: 380px) {
+    .grid-item {
+        width: calc(100% / 1);
+    }   
+}
+
 @media (min-width: 576px) {
     .grid-item {
         width: calc(100% / 2);

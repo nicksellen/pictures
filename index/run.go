@@ -72,9 +72,9 @@ type metadata struct {
 	BatteryTemperature float64 `json:"MakerNotes:BatteryTemperature"`
 	BatteryLevel       int     `json:"MakerNotes:BatteryLevel"`
 	Aperture           float64 `json:"Composite:Aperture"`
-	LensID             int     `json:"Composite:LensID"`
-	Megapixels         int     `json:"Composite:Megapixels"`
-	ShutterSpeed       float64 `json:"Composite:ShutterSpeed"`
+	//LensID             int     `json:"Composite:LensID"`
+	Megapixels   float64 `json:"Composite:Megapixels"`
+	ShutterSpeed float64 `json:"Composite:ShutterSpeed"`
 }
 
 // OpenIndex opens or creates index at this path

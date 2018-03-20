@@ -84,7 +84,7 @@ const api = {
         return fetch('/api/search', {
             method: 'POST',
             body: JSON.stringify({
-                size: 2000,
+                size: 10000,
                 /*
                 facets: {
                     tags: {
@@ -306,6 +306,10 @@ new Vue({
                 for (let i = 0; i < this.hits.length; i++) {
                     this.hitIdxById[this.hits[i].id] = i
                 }
+                this.selectedId = null
+                this.currentlyVisibleIdxs = {}
+                this.lastMinVisibleIdx = -1
+                this.lastMaxVisibleIdx = -1
                 Vue.nextTick(() => {
                     this.checkVisible()
                 })

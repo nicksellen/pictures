@@ -148,7 +148,8 @@ func (g *Gather) yay() error {
 				for _, spec := range thumbnailSpecs {
 					thumbnailFilename, err := g.findThumbnail(name, spec)
 					if err != nil {
-						log.Fatal(err)
+						log.Printf("[%s] ERROR %s", name, err)
+						return
 					}
 
 					if thumbnailFilename == "" {
@@ -159,7 +160,8 @@ func (g *Gather) yay() error {
 				if len(missingSpecs) > 0 {
 					fullsizeFilename, err := g.findOrDownload(obj)
 					if err != nil {
-						log.Fatal(err)
+						log.Printf("[%s] ERROR %s", name, err)
+						return
 					}
 					var wgObj sync.WaitGroup
 					wgObj.Add(len(missingSpecs))
@@ -169,7 +171,8 @@ func (g *Gather) yay() error {
 							defer wgObj.Done()
 							err = makeThumbnail(fullsizeFilename, g.thumbnailFilenameFor(name, spec), spec)
 							if err != nil {
-								log.Fatal(err)
+								log.Printf("[%s] ERROR %s", name, err)
+								return
 							}
 							log.Printf("[%s] created %dx%d thumbnail\n", name, spec.width, spec.height)
 						}(name, spec, fullsizeFilename)
@@ -183,13 +186,15 @@ func (g *Gather) yay() error {
 
 				metadataExists, err := fileExists(metadataFilename)
 				if err != nil {
-					log.Fatal(err)
+					log.Printf("[%s] ERROR %s", name, err)
+					return
 				}
 
 				if !metadataExists {
 					otherPlace, err := g.find(metadataName)
 					if err != nil {
-						log.Fatal(err)
+						log.Printf("[%s] ERROR %s", name, err)
+						return
 					}
 					if otherPlace == "" {
 						log.Printf("cannot find metadata for %s\n", name)
@@ -199,7 +204,8 @@ func (g *Gather) yay() error {
 					}
 					err = copyFile(otherPlace, metadataFilename)
 					if err != nil {
-						log.Fatal(err)
+						log.Printf("[%s] ERROR %s", name, err)
+						return
 					}
 					log.Printf("[%s] copied meta\n", name)
 				}
