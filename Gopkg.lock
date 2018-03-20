@@ -86,12 +86,6 @@
   revision = "5083a469fcef50a4705e3c90652246ecd6806f2a"
 
 [[projects]]
-  name = "github.com/disintegration/imaging"
-  packages = ["."]
-  revision = "fd34ef7671b12cdf1b024d98c6b327b2770d32c4"
-  version = "v1.4.1"
-
-[[projects]]
   branch = "master"
   name = "github.com/edsrzf/mmap-go"
   packages = ["."]
@@ -191,16 +185,6 @@
 
 [[projects]]
   branch = "master"
-  name = "golang.org/x/image"
-  packages = [
-    "bmp",
-    "tiff",
-    "tiff/lzw"
-  ]
-  revision = "f3a9b89b59def9194717c1d0bd4c0d08fa1afa7b"
-
-[[projects]]
-  branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
   revision = "24dd3780ca4f75fed9f321890729414a4b5d3f13"
@@ -220,6 +204,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f52adcbd84cbece76a2e41c2454fc3e0abfc802599f0a0171370d87d83c4a537"
+  inputs-digest = "dd50aa25039f05abdc2b1aa3c9f12394b5d11eca1226c09dda13a8d78972bd27"
   solver-name = "gps-cdcl"
   solver-version = 1

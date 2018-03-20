@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/disintegration/imaging"
 	"github.com/kurin/blazer/b2"
 	"github.com/rwcarlsen/goexif/exif"
 	bimg "gopkg.in/h2non/bimg.v1"
@@ -299,11 +298,7 @@ func b2DownloadFile(ctx context.Context, bucket *b2.Bucket, b2object *b2.Object,
 	return destFile.Close()
 }
 
-func makeThumbnail(sourceFilename string, destFilename string, size thumbnailSpec) error {
-	return makeThumbnailVips(sourceFilename, destFilename, size)
-}
-
-func makeThumbnailVips(sourceFilename string, destFilename string, spec thumbnailSpec) error {
+func makeThumbnail(sourceFilename string, destFilename string, spec thumbnailSpec) error {
 	destDir := filepath.Dir(destFilename)
 	err := os.MkdirAll(destDir, os.ModePerm)
 	if err != nil {
@@ -329,76 +324,6 @@ func makeThumbnailVips(sourceFilename string, destFilename string, spec thumbnai
 	}
 
 	return bimg.Write(destFilename, newImage)
-}
-
-func makeThumbnailImaging(sourceFilename string, destFilename string, size thumbnailSpec) error {
-
-	orientation, err := getOrientation(sourceFilename)
-	if err != nil {
-		return err
-	}
-
-	src, err := imaging.Open(sourceFilename)
-	if err != nil {
-		return nil
-	}
-
-	// http://sylvana.net/jpegcrop/exif_orientation.html
-	if orientation == 6 {
-		src = imaging.Rotate270(src)
-	} else if orientation == 3 {
-		src = imaging.Rotate180(src)
-	} else if orientation == 8 {
-		src = imaging.Rotate90(src)
-	}
-
-	srcWidth := src.Bounds().Dx()
-	srcHeight := src.Bounds().Dy()
-
-	width := 0
-	height := 0
-
-	if size.preserveOrientation {
-
-		longest := 0
-		shortest := 0
-
-		if size.width > size.height {
-			longest = size.width
-			shortest = size.height
-		} else {
-			longest = size.height
-			shortest = size.width
-		}
-
-		if srcWidth > srcHeight {
-			width = longest
-			height = shortest
-		} else {
-			width = shortest
-			height = longest
-		}
-
-	} else {
-
-		width = size.width
-		height = size.height
-
-	}
-
-	dst := imaging.Fill(src, width, height, imaging.Center, imaging.Lanczos)
-
-	destDir := filepath.Dir(destFilename)
-	err = os.MkdirAll(destDir, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = imaging.Save(dst, destFilename)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func fileExists(filename string) (bool, error) {
