@@ -1,6 +1,5 @@
 
 * {
-   
     box-sizing: border-box;
 }
 
@@ -16,7 +15,6 @@ body {
 .grid-item {
     flex-direction: row;
     width: calc(100% / 1);
-    /*padding: 0.4%;*/
     padding: 10px;
 }
 
@@ -52,18 +50,16 @@ body {
 
 .hit {
     cursor: pointer;
-    height: 0;
+    background: #eee;
     position: relative;
-    width: 100%;
-    background: #333;
-    padding-top: 66%;
-    overflow: hidden;
-    border: 1px solid white;
-    
+    height: 0;
+    padding-top: 74.5%; /* corresponds to the aspect ratio for the thumbnails */
+    transition: all 0.05s;
+    bottom: 0;
 }
 .selected .hit {
-    box-shadow: 0px 0px 37px -12px rgba(0,0,0,0.75);
-    border-color: red;
+    box-shadow: 0px 0px 27px -3px rgba(0,0,0,0.75);
+    bottom: 2px;
 }
 .hit > img {
     position: absolute;
@@ -77,19 +73,24 @@ body {
     font-family: monospace;
     padding-top: 10px;
     text-align: center;
-    color: #aaa;
 }
 
 .tag {
-    background-color: #efefff;
-    margin: 2px 4px;
-    padding: 4px 8px;
+    background-color: #efefef;
+    margin: 4px 4px 2px 4px;
+    padding: 4px 8px 4px 8px;
     display: inline-block;
     font-weight: bold;
+    color: #444;
+}
+
+.tag:last-child {
+    margin-bottom: 0px;
 }
 
 .tag:before {
     content: '#';
+    padding-right: 0px;
 }
 
 .selected .tag {

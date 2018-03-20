@@ -84,7 +84,7 @@ const api = {
         return fetch('/api/search', {
             method: 'POST',
             body: JSON.stringify({
-                size: 1000,
+                size: 2000,
                 /*
                 facets: {
                     tags: {
@@ -212,6 +212,8 @@ new Vue({
             this.checkVisible(scrollTop > previousScrollTop)
             previousScrollTop = scrollTop
         }))
+
+        window.addEventListener('resize', () => this.checkVisible())
     },
     computed: {
         selected () {
@@ -339,15 +341,13 @@ new Vue({
                         'last-max': idx === lastMaxVisibleIdx
                     }"
                     ref="hits">
-                    <div
-                        @click="select(hit.id)"
-                        class="hit">
-                        <img :src="isVisible(idx) ? thumbnailSrc(hit.id) : ''">
+                    <div class="hit">
+                        <img @click="select(hit.id)" :src="isVisible(idx) ? thumbnailSrc(hit.id) : ''">
                     </div>
                     <div class="meta">
-                        <span class="id">{{ hit.id }}</span>
-                        <span v-for="tag in tagsFor(hit)">
-                            <span class="tag">{{ tag }}</span>
+                        <!--<span class="id">{{ hit.id }}</span>-->
+                        <span v-for="tag in tagsFor(hit)" class="tag">
+                            {{ tag }}
                         </span>
                     </div>
                 </div>
