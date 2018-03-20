@@ -84,7 +84,7 @@ const api = {
         return fetch('/api/search', {
             method: 'POST',
             body: JSON.stringify({
-                size: 2000,
+                size: 1000,
                 /*
                 facets: {
                     tags: {
@@ -140,8 +140,7 @@ new Vue({
             hits: [],
             hitIdxById: {},
             selectedId: null,
-            atLeastOnceVisibleIdxs: [],
-            currentlyVisibleIdxs: [],
+            currentlyVisibleIdxs: {},
             lastMinVisibleIdx: -1,
             lastMaxVisibleIdx: -1
         }
@@ -228,7 +227,7 @@ new Vue({
         },
         checkVisible (isDown = true) {
             const hitEls = this.$refs.hits
-            let checked = 0
+            let checked = []
             if (hitEls && hitEls.length > 0) {
                 const columnCount = this.getColumnCount()
 
@@ -240,12 +239,11 @@ new Vue({
 
                     // downward scroll
 
-                    const startIdx = this.lastMaxVisibleIdx !== -1 ? this.lastMaxVisibleIdx : 0
-                    //const startIdx = this.lastMinVisibleIdx !== -1 ? this.lastMinVisibleIdx : 0
+                    const startIdx = this.lastMinVisibleIdx !== -1 ? this.lastMinVisibleIdx : 0
 
                     for (let idx = startIdx; idx < hitEls.length; idx += columnCount) {
                         let el = hitEls[idx]
-                        checked++
+                        checked.push(idx)
                         if (utils.isElementPartiallyInViewport(el)) {
                             if (!foundVisible) {
                                 minVisibleIdx = idx
@@ -260,14 +258,14 @@ new Vue({
                     }
                     if (minVisibleIdx !== -1 && maxVisibleIdx === -1) maxVisibleIdx = hitEls.length - 1
                 } else {
+
                     // upward scroll!
 
-                    const startIdx = this.lastMinVisibleIdx !== -1 ? this.lastMinVisibleIdx : hitEls.length - 1
-                    //const startIdx = this.lastMaxVisibleIdx !== -1 ? this.lastMaxVisibleIdx : hitEls.length - 1
+                    const startIdx = this.lastMaxVisibleIdx !== -1 ? this.lastMaxVisibleIdx : hitEls.length - 1
 
                     for (let idx = startIdx; idx > 0; idx -= columnCount) {
                         let el = hitEls[idx]
-                        checked++
+                        checked.push(idx)
                         if (utils.isElementPartiallyInViewport(el)) {
                             if (!foundVisible) {
                                 maxVisibleIdx = idx
@@ -284,16 +282,19 @@ new Vue({
                 }
 
                 if (minVisibleIdx !== -1 && maxVisibleIdx !== -1) {
-                    const currentlyVisibleIdxs = []
+                    const currentlyVisibleIdxs = {}
                     for (let idx = minVisibleIdx; idx <= maxVisibleIdx; idx++) {
-                        Vue.set(this.atLeastOnceVisibleIdxs, idx, true)
                         currentlyVisibleIdxs[idx] = true
                     }
                     this.currentlyVisibleIdxs = currentlyVisibleIdxs
                 }
 
-                this.lastMinVisibleIdx = minVisibleIdx
-                this.lastMaxVisibleIdx = maxVisibleIdx
+                // the top left visible image
+                this.lastMinVisibleIdx = minVisibleIdx - (minVisibleIdx % columnCount)
+                // the bottom right visible image
+                this.lastMaxVisibleIdx = Math.min(hitEls.length - 1, maxVisibleIdx - (maxVisibleIdx % columnCount) + columnCount - 1)
+
+                // console.log('checked', checked.length, 'values', checked.join(', '), 'min', this.lastMinVisibleIdx, 'max', this.lastMaxVisibleIdx)
             }
         },
         search() {
@@ -320,8 +321,7 @@ new Vue({
             return val.split(',')
         },
         isVisible (idx) {
-            //return this.currentlyVisibleIdxs[idx]
-            return this.atLeastOnceVisibleIdxs[idx]
+            return this.currentlyVisibleIdxs[idx]
         }
     },
     template: `
@@ -333,7 +333,11 @@ new Vue({
                     class="grid-item"
                     v-for="(hit, idx) in hits"
                     :key="hit.id"
-                    :class="{ 'selected': hit.id === selectedId }"
+                    :class="{
+                        'selected': hit.id === selectedId,
+                        'last-min': idx === lastMinVisibleIdx,
+                        'last-max': idx === lastMaxVisibleIdx
+                    }"
                     ref="hits">
                     <div
                         @click="select(hit.id)"

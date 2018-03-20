@@ -29,7 +29,7 @@ func Run() error {
 		return err
 	}
 
-	bindAddr := "localhost:7080"
+	bindAddr := "0.0.0.0:7080"
 
 	router := httprouter.New()
 
