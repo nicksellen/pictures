@@ -265,7 +265,8 @@ new Vue({
 
                     const startIdx = this.lastMaxVisibleIdx !== -1 ? this.lastMaxVisibleIdx : hitEls.length - 1
 
-                    for (let idx = startIdx; idx > 0; idx -= columnCount) {
+                    let idx = startIdx
+                    while (idx > 0) {
                         let el = hitEls[idx]
                         checked.push(idx)
                         if (utils.isElementPartiallyInViewport(el)) {
@@ -279,6 +280,7 @@ new Vue({
                                 break
                             }
                         }
+                        idx -= ((idx % columnCount) + 1);
                     }
                     if (maxVisibleIdx !== -1 && minVisibleIdx === -1) minVisibleIdx = 0
                 }
